@@ -1,16 +1,16 @@
-﻿using Elasticsearch.API.DTOs;
+﻿using Elastic.Clients.Elasticsearch;
+using Elasticsearch.API.DTOs;
 using Elasticsearch.API.Models;
-using Nest;
 using System.Collections.Immutable;
 
 namespace Elasticsearch.API.Repositories
 {
 	public class ProductRepository
 	{
-		private readonly ElasticClient _client;
+		private readonly ElasticsearchClient _client;
 		private const string indexName = "products"; 
 
-		public ProductRepository(ElasticClient client)
+		public ProductRepository(ElasticsearchClient client)
 		{
 			_client = client;
 		}
@@ -21,7 +21,7 @@ namespace Elasticsearch.API.Repositories
 
 			var response = await _client.IndexAsync(newProduct, x => x.Index(indexName));
 
-			if (!response.IsValid) return null;
+			if (!response.IsSuccess()) return null;
 
 			newProduct.Id = response.Id;
 
@@ -30,7 +30,8 @@ namespace Elasticsearch.API.Repositories
 
 		public async Task<ImmutableList<Product>> GetAllAsync()
 		{
-			var result = await _client.SearchAsync<Product>(s => s.Index(indexName).Query(q=>q.MatchAll()));
+			//var result = await _client.SearchAsync<Product>(s => s.Index(indexName).Query(q=>q.MatchAll()));
+			var result = await _client.SearchAsync<Product>(s => s.Index(indexName).Query(q => q.MatchAll(m => { })));
 			foreach (var hit in result.Hits) hit.Source.Id = hit.Id;
 			return result.Documents.ToImmutableList();
 		}
@@ -39,16 +40,16 @@ namespace Elasticsearch.API.Repositories
 		{
 			var response = await _client.GetAsync<Product>(id, x=> x.Index(indexName));
 
-			if(!response.IsValid) return null;
+			if(!response.IsSuccess()) return null;
 			response.Source.Id = response.Id;
 			return response.Source;
 		}
 
 		public async Task<bool> UpdateAsync(ProductUpdateDto productUpdateDto)
 		{
-			var response = await _client.UpdateAsync<Product, ProductUpdateDto>(productUpdateDto.Id, x => x.Index(indexName).Doc(productUpdateDto));
+			var response = await _client.UpdateAsync<Product, ProductUpdateDto>(indexName, productUpdateDto.Id, x => x.Doc(productUpdateDto));
 
-			return response.IsValid;
+			return response.IsSuccess();
 		}
 
 		public async Task<DeleteResponse> DeleteAsync(string id)
